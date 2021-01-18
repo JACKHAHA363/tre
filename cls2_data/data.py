@@ -1,7 +1,6 @@
 from collections import namedtuple
 import numpy as np
-import scipy
-import scipy.misc
+import imageio
 import sexpdata
 import torch
 from torch.autograd import Variable
@@ -39,10 +38,10 @@ class Dataset(object):
                 i = int(i)
                 lf = _clean_sexp(sexpdata.parse(lf)[0])
 
-                tr_a = scipy.misc.imread('cls2_data/data/%d_train_a.jpg' % i)
-                tr_b = scipy.misc.imread('cls2_data/data/%d_train_b.jpg' % i)
-                te_p = scipy.misc.imread('cls2_data/data/%d_test_pos.jpg' % i)
-                te_n = scipy.misc.imread('cls2_data/data/%d_test_neg.jpg' % i)
+                tr_a = imageio.imread('cls2_data/data/%d_train_a.jpg' % i)
+                tr_b = imageio.imread('cls2_data/data/%d_train_b.jpg' % i)
+                te_p = imageio.imread('cls2_data/data/%d_test_pos.jpg' % i)
+                te_n = imageio.imread('cls2_data/data/%d_test_neg.jpg' % i)
 
                 tr_a, tr_b, te_p, te_n = (
                     im.transpose(2, 0, 1).astype(np.float32) / 256.
