@@ -1,5 +1,5 @@
 from cls2_data.data import Dataset
-import evals2
+import batch_evals2 as evals2
 from util import Logger
 
 import numpy as np
