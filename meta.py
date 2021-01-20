@@ -13,6 +13,7 @@ import scipy
 
 
 SEED = 0
+HAS_CUDA = torch.cuda.is_available()
 np_random = np.random.seed(SEED)
 
 N_EMBED = 128
@@ -105,6 +106,9 @@ class Composition(nn.Module):
 
 comp_fn = Composition()
 err_fn = evals2.CosDist()
+if HAS_CUDA:
+    comp_fn = comp_fn.cuda()
+    err_fn = err_fn.cuda()
 
 
 def validate(dataset, model, logger, plot_log, epoch):
@@ -182,6 +186,8 @@ logs = []
 dataset = Dataset()
 for i in range(10):
     model = Model()
+    if HAS_CUDA:
+        model = model.cuda()
     log = train(dataset, model)
     logs.append(log)
 

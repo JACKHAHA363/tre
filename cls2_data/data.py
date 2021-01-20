@@ -4,6 +4,7 @@ import imageio
 import sexpdata
 import torch
 from torch.autograd import Variable
+import os
 
 #MSet = namedtuple('MSet', ('id', 'lf', 'labels'))
 #Batch = namedtuple('Batch',
@@ -11,6 +12,10 @@ from torch.autograd import Variable
 #        'indices', 'mids', 'lfs'))
 Datum = namedtuple('Datum', ('feats_in', 'feats_out_pos', 'feats_out_neg', 'lf'))
 Batch = namedtuple('Batch', ('feats_in', 'feats_out', 'label_out', 'lf'))
+DATASET_DIR="cls2_data/data"
+if os.environ.get('SLURM_TMPDIR') is not None:
+    DATASET_DIR = os.path.join(os.environ.get('SLURM_TMPDIR'), 'data')
+print('Load from', DATASET_DIR)
 
 def _clean_sexp(sexp):
     if isinstance(sexp, sexpdata.Symbol):
@@ -20,7 +25,7 @@ def _clean_sexp(sexp):
 class Dataset(object):
     def __init__(self):
         vocab = {}
-        with open('cls2_data/data/vocab.csv') as fh:
+        with open(os.path.join(DATASET_DIR, 'vocab.csv')) as fh:
             for line in fh:
                 word, id = line.split(',')
                 vocab[word] = id
@@ -30,7 +35,7 @@ class Dataset(object):
         m1 = 0.
         m2 = 0.
         count = 0.
-        with open('cls2_data/data/metadata.csv') as fh:
+        with open(os.path.join(DATASET_DIR, 'metadata.csv')) as fh:
             #lines = list(fh)
             #for line in lines[:100]:
             for line in fh:
@@ -38,10 +43,14 @@ class Dataset(object):
                 i = int(i)
                 lf = _clean_sexp(sexpdata.parse(lf)[0])
 
-                tr_a = imageio.imread('cls2_data/data/%d_train_a.jpg' % i)
-                tr_b = imageio.imread('cls2_data/data/%d_train_b.jpg' % i)
-                te_p = imageio.imread('cls2_data/data/%d_test_pos.jpg' % i)
-                te_n = imageio.imread('cls2_data/data/%d_test_neg.jpg' % i)
+                tr_a = imageio.imread(os.path.join(DATASET_DIR,
+                                                   '%d_train_a.jpg' % i))
+                tr_b = imageio.imread(os.path.join(DATASET_DIR,
+                                                   '%d_train_b.jpg' % i))
+                te_p = imageio.imread(os.path.join(DATASET_DIR,
+                                                   '%d_test_pos.jpg' % i))
+                te_n = imageio.imread(os.path.join(DATASET_DIR,
+                                                   '%d_test_neg.jpg' % i))
 
                 tr_a, tr_b, te_p, te_n = (
                     im.transpose(2, 0, 1).astype(np.float32) / 256.
@@ -98,9 +107,9 @@ class Dataset(object):
         feats_in, feats_out_pos, feats_out_neg, lf = zip(*(self._data[i] for i in batch_ids))
         feats_out_all = [feats_out_pos, feats_out_neg]
         feats_out = [feats_out_all[label][i] for i, label in enumerate(labels)]
-        feats_in = Variable(torch.FloatTensor(self._standardize(feats_in)))
-        feats_out = Variable(torch.FloatTensor(self._standardize(feats_out)))
-        label_out = Variable(torch.FloatTensor(np.asarray(labels)))
+        feats_in = torch.FloatTensor(self._standardize(feats_in))
+        feats_out = torch.FloatTensor(self._standardize(feats_out))
+        label_out = torch.FloatTensor(np.asarray(labels))
         return Batch(feats_in, feats_out, label_out, lf)
 
     def _standardize(self, data):
