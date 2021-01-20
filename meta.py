@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 from pandas import DataFrame
 import seaborn as sns
 import scipy
+from time import time
 
 
 SEED = 0
@@ -106,12 +107,10 @@ class Composition(nn.Module):
 
 comp_fn = Composition()
 err_fn = evals2.CosDist()
-if HAS_CUDA:
-    comp_fn = comp_fn.cuda()
-    err_fn = err_fn.cuda()
 
 
 def validate(dataset, model, logger, plot_log, epoch):
+    start = time()
     val_batch = dataset.get_val_batch()
     _, val_acc, _, val_reps = model(val_batch)
     val_acc = val_acc.item()
@@ -145,7 +144,8 @@ def validate(dataset, model, logger, plot_log, epoch):
     logger.update(INFO_TX, info_tx)
     
     plot_log.append((epoch, info_tx, np.mean(comp), val_acc))
-    
+    end = time()
+    print('validation cost {:.4f} sec'.format(end - start))
     return val_acc
 
 
@@ -159,6 +159,7 @@ def train(dataset, model):
     
     plot_log = []
     for i in range(20):
+        start = time()
         trn_loss = 0
         trn_acc = 0
         for j in range(100):
@@ -169,6 +170,9 @@ def train(dataset, model):
             opt.step()
             trn_loss += loss.item()
             trn_acc += acc.item()
+        
+        end = time()
+        print('Train epoch cost {:.4f} sec'.format(end - start))
 
         trn_loss /= 100
         trn_acc /= 100
