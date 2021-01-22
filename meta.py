@@ -19,7 +19,7 @@ HAS_CUDA = torch.cuda.is_available()
 np_random = np.random.seed(SEED)
 N_BATCH = 128
 N_EPOCH = 20
-
+NB_RUNS = 10
 
 def unwrap(var):
     return var.data.cpu().numpy()
@@ -61,6 +61,9 @@ class Composition(nn.Module):
 
 comp_fn = Composition()
 err_fn = evals2.CosDist()
+if HAS_CUDA:
+    comp_fn.cuda()
+    err_fn.cuda()
 
 
 def validate(dataset, model, logger, plot_log, epoch):
@@ -112,7 +115,7 @@ def train(dataset, model):
     plot_log = []
     validate(dataset, model, logger, plot_log, -1)
     logger.print()
-    import ipdb; ipdb.set_trace()
+
     for i in range(N_EPOCH):
         trn_loss = 0
         trn_acc = 0
@@ -139,13 +142,12 @@ def train(dataset, model):
 
 logs = []
 dataset = Dataset()
-for i in range(1):
+for i in range(NB_RUNS):
     model = Model()
     if HAS_CUDA:
         model = model.cuda()
     log = train(dataset, model)
     logs.append(log)
-import ipdb; ipdb.set_trace()
 sns.set(font_scale=1.5)
 sns.set_style("ticks", {'font.family': 'serif'})
 plt.tight_layout()

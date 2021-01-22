@@ -4,6 +4,7 @@ import torch
 from torch import nn
 from torch import optim
 
+HAS_CUDA = torch.cuda.is_available()
 class L1Dist(nn.Module):
     def forward(self, pred, target):
         return torch.abs(pred - target).sum(-1)
@@ -60,8 +61,13 @@ def evaluate(reps, exprs, comp_fn, err_fn, quiet=False, steps=400, include_pred=
                                      for i in selected_id])
                        for tuple_id in range(nb_tuple)]
         batch_exprs = tuple(batch_exprs)
-
         obj = Objective(vocab, batch_reps[0].shape[0], comp_fn, err_fn, zero_init)
+
+        if HAS_CUDA:
+            obj = obj.cuda()
+            batch_reps = batch_reps.cuda()
+            batch_exprs = tuple([expr.cuda() for expr in batch_exprs])
+
         opt = optim.RMSprop(obj.parameters(), lr=0.01)
         for t in range(steps):
             opt.zero_grad()
@@ -71,7 +77,7 @@ def evaluate(reps, exprs, comp_fn, err_fn, quiet=False, steps=400, include_pred=
             if not quiet and t % 100 == 0:
                 print(loss.item())
             opt.step()
-        final_errs[selected_id] = errs
+        final_errs[selected_id] = errs.cpu()
 
 
     #for r, e in zip(treps, texprs):

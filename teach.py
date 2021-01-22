@@ -52,6 +52,7 @@ def get_learnability(dataset, teacher):
 
 def train_loop(dataset, teacher, student, opt, mean_repr):
     trn_lb = 0
+    count = 0
 
     for _ in range(100):
         batch = dataset.get_train_batch(N_BATCH)
@@ -63,9 +64,10 @@ def train_loop(dataset, teacher, student, opt, mean_repr):
         loss.mean().backward()
         opt.step()
 
-        trn_lb += -loss.mean().item()
+        trn_lb += -loss.sum().item()
+        count += loss.shape[0]
 
-    trn_lb /= 100
+    trn_lb /= count
     return trn_lb
 
 
