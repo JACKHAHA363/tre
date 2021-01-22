@@ -48,6 +48,21 @@ class Model(nn.Module):
         )
         self._loss = nn.BCEWithLogitsLoss()
     
+    def get_repr(self, batch):
+        feats_in = batch.feats_in
+        feats_out = batch.feats_out
+        if next(self.parameters()).is_cuda:
+            feats_in = feats_in.cuda()
+            feats_out = feats_out.cuda()
+
+        n_batch, n_ex, c, w, h = feats_in.shape
+        conv_in = self._conv_part(feats_in.view(n_batch * n_ex, c, w, h))
+        fc_in = self._fc_part(conv_in.view(n_batch * n_ex, 16*5*5))
+        conv_out = self._conv_part(feats_out)
+        rep_out = self._fc_part(conv_out.view(n_batch, 16*5*5))
+        final_feat = torch.cat([fc_in, rep_out], dim=0)
+        return final_feat
+
     def forward(self, batch):
         feats_in = batch.feats_in
         feats_out = batch.feats_out
@@ -110,7 +125,6 @@ err_fn = evals2.CosDist()
 
 
 def validate(dataset, model, logger, plot_log, epoch):
-    start = time()
     val_batch = dataset.get_val_batch()
     _, val_acc, _, val_reps = model(val_batch)
     val_acc = val_acc.item()
@@ -144,9 +158,8 @@ def validate(dataset, model, logger, plot_log, epoch):
     logger.update(INFO_TX, info_tx)
     
     plot_log.append((epoch, info_tx, np.mean(comp), val_acc))
-    end = time()
-    print('validation cost {:.4f} sec'.format(end - start))
     return val_acc
+
 
 
 def train(dataset, model):
@@ -155,11 +168,10 @@ def train(dataset, model):
     logger = Logger(LOG_KEYS, LOG_FMTS, width=10)
     logger.begin()
     validate(dataset, model, logger, [], -1)
+    import ipdb; ipdb.set_trace()
     logger.print()
-    
     plot_log = []
     for i in range(20):
-        start = time()
         trn_loss = 0
         trn_acc = 0
         for j in range(100):
@@ -171,9 +183,6 @@ def train(dataset, model):
             trn_loss += loss.item()
             trn_acc += acc.item()
         
-        end = time()
-        print('Train epoch cost {:.4f} sec'.format(end - start))
-
         trn_loss /= 100
         trn_acc /= 100
         
