@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --gres=gpu:1
-#SBATCH --mem=16G
-#SBATCH --time=24:00:00
+#SBATCH --mem=4G
+#SBATCH --time=1:00:00
 #SBATCH --exclude=kepler2,kepler3
 
 
@@ -22,7 +22,7 @@ fi
 
 # Unzip data
 echo "Get data..."
-tar -xvzf ./cls2_data/data.tar.gz -C $SLURM_TMPDIR
+tar -xzf ./cls2_data/data.tar.gz -C $SLURM_TMPDIR
 
 echo "$@"
 exec $@

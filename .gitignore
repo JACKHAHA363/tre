@@ -5,7 +5,7 @@ __pycache__/
 .idea
 *.swp
 *.pdf
-
+slurm-*
 # C extensions
 *.so
 
