@@ -5,7 +5,7 @@ import torch
 
 N_BATCH = 128
 ZERO = 1e-32
-TEACH_EPOCH = 5
+TEACH_EPOCH = 10
 HAS_CUDA = torch.cuda.is_available()
 
 
@@ -36,6 +36,7 @@ def get_learnability(dataset, teacher):
             res = teacher.get_repr(batch)
             mean_repr += res.sum(0)
             count += res.shape[0]
+    mean_repr /= count
 
     best_lb = -10
     for i in range(TEACH_EPOCH):
