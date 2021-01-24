@@ -1,4 +1,4 @@
-from cls2_data.data import Dataset
+from data import Dataset
 import batch_evals2 as evals2
 from model import Model
 from util import Logger
