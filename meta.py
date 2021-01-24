@@ -12,6 +12,10 @@ from matplotlib import pyplot as plt
 from pandas import DataFrame
 import seaborn as sns
 import scipy
+from absl import logging, flags
+
+FLAGS = flags.FLAGS
+
 
 
 SEED = 0
@@ -140,33 +144,34 @@ def train(dataset, model):
     return plot_log
 
 
-logs = []
-dataset = Dataset()
-for i in range(NB_RUNS):
-    model = Model()
-    if HAS_CUDA:
-        model = model.cuda()
-    log = train(dataset, model)
-    logs.append(log)
-sns.set(font_scale=1.5)
-sns.set_style("ticks", {'font.family': 'serif'})
-plt.tight_layout()
-#cmap = sns.color_palette("coolwarm", 10)
+def run(training_folder):
+    logs = []
+    dataset = Dataset()
+    for i in range(NB_RUNS):
+        model = Model()
+        if HAS_CUDA:
+            model = model.cuda()
+        log = train(dataset, model)
+        logs.append(log)
+    sns.set(font_scale=1.5)
+    sns.set_style("ticks", {'font.family': 'serif'})
+    plt.tight_layout()
+    #cmap = sns.color_palette("coolwarm", 10)
 
-my_logs = logs
-log = sum(my_logs, [])
-data = DataFrame(np.asarray(log), columns=['epoch', 'I(θ;X)', 'TRE', 'val', 'learnability'])
-sns.lmplot(x='I(θ;X)', y='TRE', data=data)
-print(scipy.stats.pearsonr(data['I(θ;X)'], data['TRE']))
-plt.savefig('info_tre.pdf', format='pdf')
+    my_logs = logs
+    log = sum(my_logs, [])
+    data = DataFrame(np.asarray(log), columns=['epoch', 'I(θ;X)', 'TRE', 'val', 'learnability'])
+    sns.lmplot(x='I(θ;X)', y='TRE', data=data)
+    print(scipy.stats.pearsonr(data['I(θ;X)'], data['TRE']))
+    plt.savefig('info_tre.pdf', format='pdf')
 
-sns.lmplot(x='I(θ;X)', y='learnability', data=data)
-print(scipy.stats.pearsonr(data['I(θ;X)'], data['learnability']))
-plt.savefig('info_lb.pdf', format='pdf')
+    sns.lmplot(x='I(θ;X)', y='learnability', data=data)
+    print(scipy.stats.pearsonr(data['I(θ;X)'], data['learnability']))
+    plt.savefig('info_lb.pdf', format='pdf')
 
-sns.lmplot(x='TRE', y='learnability', data=data)
-print(scipy.stats.pearsonr(data['TRE'], data['learnability']))
-plt.savefig('tre_lb.pdf', format='pdf')
+    sns.lmplot(x='TRE', y='learnability', data=data)
+    print(scipy.stats.pearsonr(data['TRE'], data['learnability']))
+    plt.savefig('tre_lb.pdf', format='pdf')
 
 
 
