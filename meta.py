@@ -1,29 +1,27 @@
 from data import Dataset
 import batch_evals2 as evals2
 from model import Model
-from util import Logger
 import teach
 
 import numpy as np
-import torch
-from torch import nn, optim
+from torch import optim
 from torch.optim import lr_scheduler as opt_sched
 from matplotlib import pyplot as plt
 from pandas import DataFrame
 import seaborn as sns
 import scipy
+from tensorboardX import SummaryWriter
 from absl import logging, flags
+import os
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_integer('batch_size', default=128, help='batch size')
+flags.DEFINE_integer('epochs', default=20, help='epoch train')
+flags.DEFINE_integer('runs', default=10, help='nb runs')
+flags.DEFINE_integer('batchs_per_epoch', default=100, help='batchs in each epoch')
+flags.DEFINE_integer('teach_epochs', default=10, help='teaching epoch')
 
-
-SEED = 0
-HAS_CUDA = torch.cuda.is_available()
-np_random = np.random.seed(SEED)
-N_BATCH = 128
-N_EPOCH = 20
-NB_RUNS = 10
 
 def unwrap(var):
     return var.data.cpu().numpy()
@@ -54,77 +52,65 @@ ISOM = 'isom'
 HOM = 'hom'
 CHOM = 'c_hom'
 LB = 'learnabiliy'
-LOG_KEYS = [EPOCH, TRN_LOSS, TRN_ACC, VAL_ACC, HOM,   ISOM,  INFO_TX, LB]
-LOG_FMTS = ['d',   '.3f',    '.3f',   '.3f',   '.3f', '.3f', '.3f', '.3f']
 
 
-class Composition(nn.Module):
-    def forward(self, x, y):
-        return x + y
+def validate(dataset, model):
+    model.eval()
+    metrics = {}
 
-
-comp_fn = Composition()
-err_fn = evals2.CosDist()
-if HAS_CUDA:
-    comp_fn.cuda()
-    err_fn.cuda()
-
-
-def validate(dataset, model, logger, plot_log, epoch):
     # Learnability
     lb = teach.get_learnability(dataset, teacher=model)
-    logger.update(LB, lb)
+    metrics[LB] = lb
 
     val_batch = dataset.get_val_batch()
     _, val_acc, _, val_reps = model(val_batch)
     val_acc = val_acc.item()
-    logger.update(VAL_ACC, val_acc)
-    
+    metrics[VAL_ACC] = val_acc
+
     cval_batch = dataset.get_cval_batch()
     _, cval_acc, _, cval_reps = model(cval_batch)
     cval_acc = cval_acc.item()
-    logger.update(CVAL_ACC, cval_acc)
-    
+    metrics[CVAL_ACC] = cval_acc
+
     prim_batch = dataset.get_prim_batch()
     _, _, _, prim_reps = model(prim_batch)
     
     prim_rseq = [unwrap(prim_reps[i, ...]) for i in range(prim_reps.shape[0])]
     val_rseq = [unwrap(val_reps[i, ...]) for i in range(val_reps.shape[0])]
-    cval_rseq = [unwrap(cval_reps[i, ...]) for i in range(cval_reps.shape[0])]
-    
+
     comp = evals2.evaluate(
-        prim_rseq + val_rseq, prim_batch.lf + val_batch.lf,
-        comp_fn, err_fn, quiet=True)
-    logger.update(HOM, np.mean(comp))
-    
-    #ccomp = evals2.evaluate(
-    #    prim_rseq + cval_rseq, prim_batch.lf + cval_batch.lf,
-    #    comp_fn, err_fn)[-len(cval_rseq):]
-    #logger.update(CHOM, np.mean(ccomp))
-    
-    #logger.update(ISOM, eval_isom_tree(unwrap(val_reps), val_batch.lf))
-    #info_tx = info(unwrap(nn.functional.tanh(val_reps)))
+        reps=prim_rseq + val_rseq,
+        exprs=prim_batch.lf + val_batch.lf, quiet=True)
+    metrics[HOM] = np.mean(comp)
+
     info_tx = info(unwrap(val_reps))
-    logger.update(INFO_TX, info_tx)
-    
-    plot_log.append((epoch, info_tx, np.mean(comp), val_acc, lb))
-    return val_acc
+    metrics[INFO_TX] = info_tx
+    return metrics
 
 
-def train(dataset, model):
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group["lr"]
+
+
+def train(dataset, model, tb_writer):
     opt = optim.Adam(model.parameters(), lr=1e-3)
     sched = opt_sched.ReduceLROnPlateau(opt, factor=0.5, verbose=True, mode='max')
-    logger = Logger(LOG_KEYS, LOG_FMTS, width=10)
-    logger.begin()
-    plot_log = []
-    validate(dataset, model, logger, plot_log, -1)
-    logger.print()
+    logs = {}
+    for i in range(FLAGS.epochs):
+        model.eval()
+        val_metric = validate(dataset, model)
+        logging_str = ['VAL[epoch={}]'.format(i)]
+        for key, val in val_metric.items():
+            logging_str.append("{}:{:.4f}".format(key, val))
+            tb_writer.add_scalar('val/{}'.format(key), val, i)
+        logging.info(' '.join(logging_str))
 
-    for i in range(N_EPOCH):
         trn_loss = 0
         trn_acc = 0
-        for j in range(100):
-            batch = dataset.get_train_batch(N_BATCH)
+        model.train()
+        for j in range(FLAGS.batchs_per_epoch):
+            batch = dataset.get_train_batch(FLAGS.batch_size)
             loss, acc, _, _ = model(batch)
             opt.zero_grad()
             loss.backward()
@@ -132,31 +118,39 @@ def train(dataset, model):
             trn_loss += loss.item()
             trn_acc += acc.item()
         
-        trn_loss /= 100
-        trn_acc /= 100
+        trn_loss /= FLAGS.batchs_per_epoch
+        trn_acc /= FLAGS.batchs_per_epoch
         
-        logger.update(EPOCH, i)
-        logger.update(TRN_LOSS, trn_loss)
-        logger.update(TRN_ACC, trn_acc)
-        val_acc = validate(dataset, model, logger, plot_log, i)
-        sched.step(val_acc)
-        logger.print()
-    return plot_log
+        sched.step(val_metric[VAL_ACC])
+
+        train_metric = {TRN_LOSS: trn_loss,
+                        TRN_ACC: trn_acc,
+                        'lr': get_lr(opt)}
+        logging_str = ['TRAIN[epoch={}]'.format(i)]
+        for key, val in train_metric.items():
+            logging_str.append("{}:{:.4f}".format(key, val))
+            tb_writer.add_scalar('train/{}'.format(key), val, i)
+        logging.info(' '.join(logging_str))
+
+        import ipdb; ipdb.set_trace()
+        metric = {**val_metric, **train_metric}
+        logs.append(metric)
+    return logs
 
 
 def run(training_folder):
     logs = []
     dataset = Dataset()
-    for i in range(NB_RUNS):
+    for i in range(FLAGS.runs):
+        writer = SummaryWriter(os.path.join(training_folder, 'train/run{}'.format(i)))
         model = Model()
-        if HAS_CUDA:
+        if FLAGS.cuda:
             model = model.cuda()
-        log = train(dataset, model)
+        log = train(dataset, model, writer)
         logs.append(log)
     sns.set(font_scale=1.5)
     sns.set_style("ticks", {'font.family': 'serif'})
     plt.tight_layout()
-    #cmap = sns.color_palette("coolwarm", 10)
 
     my_logs = logs
     log = sum(my_logs, [])

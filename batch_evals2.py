@@ -1,27 +1,46 @@
-from util import flatten
 
 import torch
 from torch import nn
 from torch import optim
+from absl import flags, logging
 
-HAS_CUDA = torch.cuda.is_available()
+FLAGS = flags.FLAGS
+
+
+def flatten(l):
+    if not isinstance(l, tuple):
+        return (l,)
+
+    out = ()
+    for ll in l:
+        out = out + flatten(ll)
+    return out
+
+
 class L1Dist(nn.Module):
     def forward(self, pred, target):
         return torch.abs(pred - target).sum(-1)
+
 
 class CosDist(nn.Module):
     def forward(self, x, y):
         nx, ny = nn.functional.normalize(x), nn.functional.normalize(y)
         return 1 - (nx * ny).sum(-1)
 
+
+class Composition(nn.Module):
+    def forward(self, x, y):
+        return x + y
+
+
 class Objective(nn.Module):
-    def __init__(self, vocab, repr_size, comp_fn, err_fn, zero_init):
+    def __init__(self, vocab, repr_size, zero_init):
         super().__init__()
         self.emb = nn.Embedding(len(vocab), repr_size)
         if zero_init:
             self.emb.weight.data.zero_()
-        self.comp = comp_fn
-        self.err = err_fn
+        self.comp = Composition()
+        self.err = CosDist()
 
     def compose(self, e):
         if isinstance(e, tuple) and len(e) > 1:
@@ -34,7 +53,8 @@ class Objective(nn.Module):
     def forward(self, rep, expr):
         return self.err(self.compose(expr), rep)
 
-def evaluate(reps, exprs, comp_fn, err_fn, quiet=False, steps=400, include_pred=False, zero_init=True):
+
+def evaluate(reps, exprs, quiet=False, steps=400, include_pred=False, zero_init=True):
     vocab = {}
     for expr in exprs:
         toks = flatten(expr)
@@ -61,9 +81,9 @@ def evaluate(reps, exprs, comp_fn, err_fn, quiet=False, steps=400, include_pred=
                                      for i in selected_id])
                        for tuple_id in range(nb_tuple)]
         batch_exprs = tuple(batch_exprs)
-        obj = Objective(vocab, batch_reps[0].shape[0], comp_fn, err_fn, zero_init)
+        obj = Objective(vocab, batch_reps[0].shape[0], zero_init)
 
-        if HAS_CUDA:
+        if FLAGS.cuda:
             obj = obj.cuda()
             batch_reps = batch_reps.cuda()
             batch_exprs = tuple([expr.cuda() for expr in batch_exprs])
@@ -75,14 +95,11 @@ def evaluate(reps, exprs, comp_fn, err_fn, quiet=False, steps=400, include_pred=
             loss = sum(errs)
             loss.backward()
             if not quiet and t % 100 == 0:
-                print(loss.item())
+                logging.info(loss.item())
             opt.step()
         final_errs[selected_id] = errs.cpu()
 
 
-    #for r, e in zip(treps, texprs):
-    #    print(r, obj.compose(e))
-    #assert False
     final_errs = [err.item() for err in final_errs]
     if include_pred:
         lexicon = {
