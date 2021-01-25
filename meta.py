@@ -13,6 +13,7 @@ import scipy
 from tensorboardX import SummaryWriter
 from absl import logging, flags
 import os
+from tb_utils import parse_tb_event_files
 
 FLAGS = flags.FLAGS
 
@@ -42,11 +43,10 @@ def info(reps):
     return entropies.mean()
 
 
-EPOCH = 'epoch'
-TRN_LOSS = 'trn loss'
-TRN_ACC = 'trn acc'
-VAL_ACC = 'val acc'
-CVAL_ACC = 'cval acc'
+TRN_LOSS = 'trn_loss'
+TRN_ACC = 'trn_acc'
+VAL_ACC = 'val_acc'
+CVAL_ACC = 'cval_acc'
 INFO_TX = 'I(T;X)'
 ISOM = 'isom'
 HOM = 'hom'
@@ -96,15 +96,21 @@ def get_lr(optimizer):
 def train(dataset, model, tb_writer):
     opt = optim.Adam(model.parameters(), lr=1e-3)
     sched = opt_sched.ReduceLROnPlateau(opt, factor=0.5, verbose=True, mode='max')
-    logs = {}
-    for i in range(FLAGS.epochs):
+
+    epoch = 0
+    while True:
         model.eval()
         val_metric = validate(dataset, model)
-        logging_str = ['VAL[epoch={}]'.format(i)]
+        logging_str = ['VAL[epoch={}]'.format(epoch)]
         for key, val in val_metric.items():
             logging_str.append("{}:{:.4f}".format(key, val))
-            tb_writer.add_scalar('val/{}'.format(key), val, i)
+            tb_writer.add_scalar('val/{}'.format(key), val, epoch)
         logging.info(' '.join(logging_str))
+
+        # Train loop
+        if epoch == FLAGS.epochs:
+            logging.info('Reach maximum epoch')
+            break
 
         trn_loss = 0
         trn_acc = 0
@@ -117,7 +123,7 @@ def train(dataset, model, tb_writer):
             opt.step()
             trn_loss += loss.item()
             trn_acc += acc.item()
-        
+        epoch += 1
         trn_loss /= FLAGS.batchs_per_epoch
         trn_acc /= FLAGS.batchs_per_epoch
         
@@ -126,16 +132,11 @@ def train(dataset, model, tb_writer):
         train_metric = {TRN_LOSS: trn_loss,
                         TRN_ACC: trn_acc,
                         'lr': get_lr(opt)}
-        logging_str = ['TRAIN[epoch={}]'.format(i)]
+        logging_str = ['TRAIN[epoch={}]'.format(epoch)]
         for key, val in train_metric.items():
             logging_str.append("{}:{:.4f}".format(key, val))
-            tb_writer.add_scalar('train/{}'.format(key), val, i)
+            tb_writer.add_scalar('train/{}'.format(key), val, epoch)
         logging.info(' '.join(logging_str))
-
-        import ipdb; ipdb.set_trace()
-        metric = {**val_metric, **train_metric}
-        logs.append(metric)
-    return logs
 
 
 def run(training_folder):
@@ -146,7 +147,10 @@ def run(training_folder):
         model = Model()
         if FLAGS.cuda:
             model = model.cuda()
-        log = train(dataset, model, writer)
+        train(dataset, model, writer)
+        writer.close()
+        stats = parse_tb_event_files(os.path.join(training_folder, 'train/run{}'.format(i)))
+        import ipdb; ipdb.set_trace()
         logs.append(log)
     sns.set(font_scale=1.5)
     sns.set_style("ticks", {'font.family': 'serif'})
