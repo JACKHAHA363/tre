@@ -32,6 +32,10 @@ class Series:
         for i in range(len(self.steps) - 1):
             assert self.steps[i] <= self.steps[i + 1]
 
+    def to_dict(self):
+        self.verify()
+        return {'steps': self.steps,
+                'values': self.values}
 
 def get_empty_series(steps):
     result = Series()

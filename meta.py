@@ -14,6 +14,7 @@ from tensorboardX import SummaryWriter
 from absl import logging, flags
 import os
 from tb_utils import parse_tb_event_files
+import pickle
 
 FLAGS = flags.FLAGS
 
@@ -47,11 +48,11 @@ TRN_LOSS = 'trn_loss'
 TRN_ACC = 'trn_acc'
 VAL_ACC = 'val_acc'
 CVAL_ACC = 'cval_acc'
-INFO_TX = 'I(T;X)'
+INFO_TX = 'MI'
 ISOM = 'isom'
 HOM = 'hom'
 CHOM = 'c_hom'
-LB = 'learnabiliy'
+LB = 'learnability'
 
 
 def validate(dataset, model):
@@ -104,7 +105,7 @@ def train(dataset, model, tb_writer):
         logging_str = ['VAL[epoch={}]'.format(epoch)]
         for key, val in val_metric.items():
             logging_str.append("{}:{:.4f}".format(key, val))
-            tb_writer.add_scalar('val/{}'.format(key), val, epoch)
+            tb_writer.add_scalar('{}'.format(key), val, epoch)
         logging.info(' '.join(logging_str))
 
         # Train loop
@@ -135,7 +136,7 @@ def train(dataset, model, tb_writer):
         logging_str = ['TRAIN[epoch={}]'.format(epoch)]
         for key, val in train_metric.items():
             logging_str.append("{}:{:.4f}".format(key, val))
-            tb_writer.add_scalar('train/{}'.format(key), val, epoch)
+            tb_writer.add_scalar('{}'.format(key), val, epoch)
         logging.info(' '.join(logging_str))
 
 
@@ -150,26 +151,34 @@ def run(training_folder):
         train(dataset, model, writer)
         writer.close()
         stats = parse_tb_event_files(os.path.join(training_folder, 'train/run{}'.format(i)))
-        import ipdb; ipdb.set_trace()
-        logs.append(log)
+        stats = {k: v.to_dict() for k, v in stats.items()}
+        logs.append(stats)
+
+    # Save run data
+    with open(os.path.join(training_folder, 'stats.pkl'), 'wb') as f:
+        pickle.dump(logs, f)
+
+    # Create
     sns.set(font_scale=1.5)
     sns.set_style("ticks", {'font.family': 'serif'})
     plt.tight_layout()
 
-    my_logs = logs
-    log = sum(my_logs, [])
-    data = DataFrame(np.asarray(log), columns=['epoch', 'I(θ;X)', 'TRE', 'val', 'learnability'])
-    sns.lmplot(x='I(θ;X)', y='TRE', data=data)
-    print(scipy.stats.pearsonr(data['I(θ;X)'], data['TRE']))
-    plt.savefig('info_tre.pdf', format='pdf')
-
-    sns.lmplot(x='I(θ;X)', y='learnability', data=data)
-    print(scipy.stats.pearsonr(data['I(θ;X)'], data['learnability']))
-    plt.savefig('info_lb.pdf', format='pdf')
-
-    sns.lmplot(x='TRE', y='learnability', data=data)
-    print(scipy.stats.pearsonr(data['TRE'], data['learnability']))
-    plt.savefig('tre_lb.pdf', format='pdf')
-
-
-
+    new_logs = [[(epoch, info_x, tre, val_acc, lb)
+                 for epoch, info_x, tre, val_acc, lb in zip(log[LB]['steps'], log[INFO_TX]['values'],
+                                                            log[HOM]['values'], log[VAL_ACC]['values'],
+                                                            log[LB]['values'])]
+                 for log in logs]
+    log = sum(new_logs, [])
+    data = DataFrame(np.asarray(log), columns=['epoch', 'MI', 'TRE', 'val', 'LB'])
+    tobeplot = data.columns[1:]
+    for x_id in range(len(tobeplot)):
+        for y_id in range(x_id + 1, len(tobeplot)):
+            names = [tobeplot[x_id], tobeplot[y_id]]
+            names = sorted(names)
+            x_name, y_name = names
+            sns.lmplot(x=x_name, y=y_name, data=data)
+            logging.info("pearson coeffcient {} {}: {}".format(
+                x_name, y_name,
+                scipy.stats.pearsonr(data[x_name], data[y_name])))
+            plt.savefig(os.path.join(training_folder, '{}_{}.pdf'.format(x_name, y_name)),
+                        format='pdf')

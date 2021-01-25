@@ -36,20 +36,21 @@ def handler(type, value, tb):
 
 
 def random_string():
-    return ''.join(random.sample(string.ascii_lowercase + string.ascii_uppercase, k=10))
+    return ''.join(random.sample(string.ascii_lowercase + string.ascii_uppercase, k=5))
 
 
 def setup_logging_and_exp_folder():
+    # Use time stamp or user specified if not debug
+    ts = time.time()
+    FLAGS.experiment = FLAGS.experiment if FLAGS.experiment is not None else \
+        "{}_{}".format(FLAGS.mode,
+                       datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M'))
+
     # Random string if debug
     if FLAGS.debug:
-        FLAGS.experiment = "{}_{}".format(FLAGS.mode, random_string())
+        FLAGS.experiment = "{}_debug_{}".format(FLAGS.experiment, random_string())
 
-    # Use time stamp or user specified if not debug
-    else:
-        ts = time.time()
-        FLAGS.experiment = FLAGS.experiment if FLAGS.experiment is not None else \
-            "{}_{}".format(FLAGS.mode,
-                           datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M'))
+
     training_folder = os.path.join(EXP_FOLDER, FLAGS.experiment)
 
     # Create train folder
