@@ -19,10 +19,10 @@ import pickle
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('batch_size', default=128, help='batch size')
-flags.DEFINE_integer('epochs', default=20, help='epoch train')
+flags.DEFINE_integer('epochs', default=25, help='epoch train')
 flags.DEFINE_integer('runs', default=10, help='nb runs')
 flags.DEFINE_integer('batchs_per_epoch', default=100, help='batchs in each epoch')
-flags.DEFINE_integer('teach_epochs', default=10, help='teaching epoch')
+flags.DEFINE_integer('teach_epochs', default=15, help='teaching epoch')
 
 
 def unwrap(var):

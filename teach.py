@@ -19,6 +19,11 @@ def get_loss(repr1, repr2):
     return -(student_repr * teach_repr).sum(dim=1)
 
 
+def get_lr(optimizer):
+    for param_group in optimizer.param_groups:
+        return param_group["lr"]
+
+
 def get_learnability(dataset, teacher):
     teacher.eval()
     student = Model()
@@ -44,10 +49,22 @@ def get_learnability(dataset, teacher):
         val_lb = val_loop(dataset, teacher, student, mean_repr)
         if val_lb > best_lb:
             best_lb = val_lb
+        logging.info('val_lb: {:.4f} best_lb: {:.4f} lr: {:.4f}'.format(val_lb,
+                                                                        best_lb, 
+                                                                        get_lr(opt)))
 
         student.train()
         _ = train_loop(dataset, teacher, student, opt, mean_repr)
         sched.step(val_lb)
+
+    student.eval()
+    val_lb = val_loop(dataset, teacher, student, mean_repr)
+    if val_lb > best_lb:
+        best_lb = val_lb
+    logging.info('val_lb: {:.4f} best_lb: {:.4f} lr: {:.4f}'.format(val_lb,
+                                                                    best_lb, 
+                                                                    get_lr(opt)))
+
     return best_lb
 
 

@@ -50,7 +50,6 @@ def setup_logging_and_exp_folder():
     if FLAGS.debug:
         FLAGS.experiment = "{}_debug_{}".format(FLAGS.experiment, random_string())
 
-
     training_folder = os.path.join(EXP_FOLDER, FLAGS.experiment)
 
     # Create train folder
