@@ -67,7 +67,10 @@ def evaluate(reps, exprs, quiet=False, steps=400, include_pred=False, zero_init=
             return tuple(index(ee) for ee in e)
         return torch.LongTensor([vocab[e]])
 
-    treps = [torch.FloatTensor([r]) for r in reps]
+    treps = torch.cat([torch.FloatTensor([r]) for r in reps])
+    mean_repr = treps.mean(0, keepdim=True)
+    treps = treps - mean_repr
+    treps = treps.split(1)
     texprs = [index(e) for e in exprs]
     final_errs = torch.zeros(len(treps)).to(device=treps[0].device)
 

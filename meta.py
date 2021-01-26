@@ -19,10 +19,10 @@ import pickle
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('batch_size', default=128, help='batch size')
-flags.DEFINE_integer('epochs', default=25, help='epoch train')
+flags.DEFINE_integer('epochs', default=40, help='epoch train')
 flags.DEFINE_integer('runs', default=10, help='nb runs')
-flags.DEFINE_integer('batchs_per_epoch', default=100, help='batchs in each epoch')
-flags.DEFINE_integer('teach_epochs', default=15, help='teaching epoch')
+flags.DEFINE_integer('batchs_per_epoch', default=70, help='batchs in each epoch')
+flags.DEFINE_integer('teach_epochs', default=20, help='teaching epoch')
 
 
 def unwrap(var):
@@ -98,7 +98,7 @@ def get_lr(optimizer):
 
 
 def train(dataset, model, tb_writer):
-    opt = optim.Adam(model.parameters(), lr=1e-3)
+    opt = optim.Adam(model.parameters(), lr=5e-4)
     sched = opt_sched.ReduceLROnPlateau(opt, factor=0.5, verbose=True, mode='max')
 
     epoch = 0

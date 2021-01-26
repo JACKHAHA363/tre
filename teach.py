@@ -29,7 +29,7 @@ def get_learnability(dataset, teacher):
     student = Model()
     if FLAGS.cuda:
         student.cuda()
-    opt = optim.Adam(student.parameters(), lr=1e-3)
+    opt = optim.Adam(student.parameters(), lr=5e-4)
     sched = opt_sched.ReduceLROnPlateau(opt, factor=0.5, verbose=True, mode='max')
 
     # Get mean train vec
