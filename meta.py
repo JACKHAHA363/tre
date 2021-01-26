@@ -46,6 +46,7 @@ def info(reps):
 
 TRN_LOSS = 'trn_loss'
 TRN_ACC = 'trn_acc'
+VAL_LOSS = 'val_loss'
 VAL_ACC = 'val_acc'
 CVAL_ACC = 'cval_acc'
 INFO_TX = 'MI'
@@ -64,9 +65,11 @@ def validate(dataset, model):
     metrics[LB] = lb
 
     val_batch = dataset.get_val_batch()
-    _, val_acc, _, val_reps = model(val_batch)
+    val_loss, val_acc, _, val_reps = model(val_batch)
     val_acc = val_acc.item()
+    val_loss = val_loss.item()
     metrics[VAL_ACC] = val_acc
+    metrics[VAL_LOSS] = val_loss
 
     cval_batch = dataset.get_cval_batch()
     _, cval_acc, _, cval_reps = model(cval_batch)
@@ -164,9 +167,9 @@ def run(training_folder):
     plt.tight_layout()
 
     new_logs = [[(epoch, info_x, tre, val_acc, lb)
-                 for epoch, info_x, tre, val_acc, lb in zip(log[LB]['steps'], log[INFO_TX]['values'],
-                                                            log[HOM]['values'], log[VAL_ACC]['values'],
-                                                            log[LB]['values'])]
+                 for epoch, info_x, tre, val_acc, lb, val_loss in zip(log[LB]['steps'], log[INFO_TX]['values'],
+                                                                      log[HOM]['values'], log[VAL_ACC]['values'],
+                                                                      log[LB]['values'], log[VAL_LOSS]['values'])]
                  for log in logs]
     log = sum(new_logs, [])
     data = DataFrame(np.asarray(log), columns=['epoch', 'MI', 'TRE', 'val', 'LB'])
