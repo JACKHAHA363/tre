@@ -52,6 +52,7 @@ CVAL_ACC = 'cval_acc'
 INFO_TX = 'MI'
 ISOM = 'isom'
 HOM = 'hom'
+HOM_WO_MEAN = 'hom_wo_mean'
 CHOM = 'c_hom'
 LB = 'learnability'
 
@@ -78,14 +79,23 @@ def validate(dataset, model):
 
     prim_batch = dataset.get_prim_batch()
     _, _, _, prim_reps = model(prim_batch)
-    
+
     prim_rseq = [unwrap(prim_reps[i, ...]) for i in range(prim_reps.shape[0])]
     val_rseq = [unwrap(val_reps[i, ...]) for i in range(val_reps.shape[0])]
 
     comp = evals2.evaluate(
         reps=prim_rseq + val_rseq,
-        exprs=prim_batch.lf + val_batch.lf, quiet=True)
+        exprs=prim_batch.lf + val_batch.lf, quiet=True,
+        subtract_mean=False
+    )
     metrics[HOM] = np.mean(comp)
+
+    comp = evals2.evaluate(
+        reps=prim_rseq + val_rseq,
+        exprs=prim_batch.lf + val_batch.lf, quiet=True,
+        subtract_mean=True,
+    )
+    metrics[HOM_WO_MEAN] = np.mean(comp)
 
     info_tx = info(unwrap(val_reps))
     metrics[INFO_TX] = info_tx
@@ -166,13 +176,16 @@ def run(training_folder):
     sns.set_style("ticks", {'font.family': 'serif'})
     plt.tight_layout()
 
-    new_logs = [[(epoch, info_x, tre, val_acc, lb)
-                 for epoch, info_x, tre, val_acc, lb, val_loss in zip(log[LB]['steps'], log[INFO_TX]['values'],
-                                                                      log[HOM]['values'], log[VAL_ACC]['values'],
-                                                                      log[LB]['values'], log[VAL_LOSS]['values'])]
+    new_logs = [[(epoch, info_x, tre, val_acc, lb, val_loss, tre_no_mean)
+                 for epoch, info_x, tre, val_acc, lb, val_loss, tre_no_mean in zip(log[LB]['steps'], log[INFO_TX]['values'],
+                                                                                   log[HOM]['values'], log[VAL_ACC]['values'],
+                                                                                   log[LB]['values'],
+                                                                                   log[VAL_LOSS]['values'],
+                                                                                   log[HOM_WO_MEAN]['values'])]
                  for log in logs]
     log = sum(new_logs, [])
-    data = DataFrame(np.asarray(log), columns=['epoch', 'MI', 'TRE', 'val', 'LB'])
+    data = DataFrame(np.asarray(log), columns=['epoch', 'MI', 'TRE', 'val_acc',
+                                               'LB', 'val_loss', 'TRE_no_mean'])
     tobeplot = data.columns[1:]
     for x_id in range(len(tobeplot)):
         for y_id in range(x_id + 1, len(tobeplot)):
