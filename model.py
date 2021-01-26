@@ -35,10 +35,8 @@ class Model(nn.Module):
         n_batch, n_ex, c, w, h = feats_in.shape
         conv_in = self._conv_part(feats_in.view(n_batch * n_ex, c, w, h))
         fc_in = self._fc_part(conv_in.view(n_batch * n_ex, 16*5*5))
-        conv_out = self._conv_part(feats_out)
-        rep_out = self._fc_part(conv_out.view(n_batch, 16*5*5))
-        final_feat = torch.cat([fc_in, rep_out], dim=0)
-        return final_feat
+        predictor = self._pred_part(fc_in.view(n_batch, n_ex, 64).sum(dim=1))
+        return predictor
 
     def forward(self, batch):
         feats_in = batch.feats_in
