@@ -35,7 +35,7 @@ class Model(nn.Module):
         n_batch, n_ex, c, w, h = feats_in.shape
         conv_in = self._conv_part(feats_in.view(n_batch * n_ex, c, w, h))
         fc_in = self._fc_part(conv_in.view(n_batch * n_ex, 16*5*5))
-        return fc_in
+        return fc_in.view(n_batch, n_ex, 64).sum(dim=1)
 
     def forward(self, batch):
         feats_in = batch.feats_in

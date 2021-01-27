@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --gres=gpu:1
 #SBATCH --mem=8G
-#SBATCH --time=6:00:00
+#SBATCH --time=16:00:00
 #SBATCH --exclude=kepler2
 
 
