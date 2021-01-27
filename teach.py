@@ -2,6 +2,7 @@ from model import Model
 import torch.optim as optim
 import torch.optim.lr_scheduler as opt_sched
 import torch
+import numpy as np
 from absl import flags, logging
 
 FLAGS = flags.FLAGS
@@ -26,16 +27,29 @@ def get_lr(optimizer):
 
 def get_learnability(dataset, teacher):
     teacher.eval()
-    student = Model()
-    if FLAGS.cuda:
-        student.cuda()
-    opt = optim.Adam(student.parameters(), lr=5e-4)
-    sched = opt_sched.ReduceLROnPlateau(opt, factor=0.5, verbose=True, mode='max')
-
     mean_repr = get_mean_repr(dataset, teacher)
+   
+    best_lbs = []
+    for _ in range(FLAGS.teach_runs):
+        best_lb = -10
+        student = Model()
+        if FLAGS.cuda:
+            student.cuda()
+        opt = optim.Adam(student.parameters(), lr=5e-4)
+        sched = opt_sched.ReduceLROnPlateau(opt, factor=0.5, verbose=True, mode='max')
+        for i in range(FLAGS.teach_epochs):
+            student.eval()
+            val_lb = val_loop(dataset, teacher, student, mean_repr)
+            if val_lb > best_lb:
+                best_lb = val_lb
+            #logging.info('val_lb: {:.4f} best_lb: {:.4f} lr: {:.4f}'.format(val_lb,
+            #                                                                best_lb, 
+            #                                                                get_lr(opt)))
 
-    best_lb = -10
-    for i in range(FLAGS.teach_epochs):
+            student.train()
+            _ = train_loop(dataset, teacher, student, opt, mean_repr)
+            sched.step(val_lb)
+
         student.eval()
         val_lb = val_loop(dataset, teacher, student, mean_repr)
         if val_lb > best_lb:
@@ -43,20 +57,8 @@ def get_learnability(dataset, teacher):
         logging.info('val_lb: {:.4f} best_lb: {:.4f} lr: {:.4f}'.format(val_lb,
                                                                         best_lb, 
                                                                         get_lr(opt)))
-
-        student.train()
-        _ = train_loop(dataset, teacher, student, opt, mean_repr)
-        sched.step(val_lb)
-
-    student.eval()
-    val_lb = val_loop(dataset, teacher, student, mean_repr)
-    if val_lb > best_lb:
-        best_lb = val_lb
-    logging.info('val_lb: {:.4f} best_lb: {:.4f} lr: {:.4f}'.format(val_lb,
-                                                                    best_lb, 
-                                                                    get_lr(opt)))
-
-    return best_lb
+        best_lbs.append(best_lb)
+    return np.mean(best_lbs)
 
 
 def get_mean_repr(dataset, teacher):
