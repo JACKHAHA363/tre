@@ -13,6 +13,7 @@ import random
 import os
 import git
 import meta
+import il
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 EXP_FOLDER = os.path.join(ROOT_DIR, 'experiments')
@@ -24,7 +25,7 @@ CURR_VERSION = sha[:10]
 FLAGS = flags.FLAGS
 
 flags.DEFINE_bool('debug', default=False, help='Flag for debug mode')
-flags.DEFINE_enum('mode', default='meta', enum_values=['meta'],
+flags.DEFINE_enum('mode', default='meta', enum_values=['meta', 'il'],
                   help='choosing modes')
 flags.DEFINE_string('experiment', default=None, help='Name of experiment')
 flags.DEFINE_bool('cuda', default=False, help='Use cuda')
@@ -78,7 +79,12 @@ def main(_):
     with open(fpath, 'w') as f:
         f.write(FLAGS.flags_into_string())
 
-    meta.run(training_folder)
+    if FLAGS.mode == 'meta':
+        meta.run(training_folder)
+    elif FLAGS.mode == 'il':
+        il.run(training_folder)
+    else:
+        raise ValueError('Invalid mode')
     logging.info('Done')
 
 

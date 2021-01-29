@@ -32,16 +32,7 @@ def get_learnability(dataset, teacher):
     opt = optim.Adam(student.parameters(), lr=5e-4)
     sched = opt_sched.ReduceLROnPlateau(opt, factor=0.5, verbose=True, mode='max')
 
-    # Get mean train vec
-    mean_repr = 0
-    count = 0
-    with torch.no_grad():
-        for _ in range(FLAGS.batchs_per_epoch):
-            batch = dataset.get_train_batch(FLAGS.batch_size)
-            res = teacher.get_repr(batch)
-            mean_repr += res.sum(0)
-            count += res.shape[0]
-    mean_repr /= count
+    mean_repr = get_mean_repr(dataset, teacher)
 
     best_lb = -10
     for i in range(FLAGS.teach_epochs):
@@ -66,6 +57,20 @@ def get_learnability(dataset, teacher):
                                                                     get_lr(opt)))
 
     return best_lb
+
+
+def get_mean_repr(dataset, teacher):
+    # Get mean train vec
+    mean_repr = 0
+    count = 0
+    with torch.no_grad():
+        for _ in range(FLAGS.batchs_per_epoch):
+            batch = dataset.get_train_batch(FLAGS.batch_size)
+            res = teacher.get_repr(batch)
+            mean_repr += res.sum(0)
+            count += res.shape[0]
+    mean_repr /= count
+    return mean_repr
 
 
 def train_loop(dataset, teacher, student, opt, mean_repr):
