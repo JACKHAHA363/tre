@@ -19,11 +19,9 @@ import pickle
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('batch_size', default=128, help='batch size')
-flags.DEFINE_integer('epochs', default=55, help='epoch train')
-flags.DEFINE_integer('runs', default=5, help='nb runs')
+flags.DEFINE_integer('epochs', default=20, help='epoch train')
 flags.DEFINE_integer('batchs_per_epoch', default=70, help='batchs in each epoch')
 flags.DEFINE_integer('teach_epochs', default=5, help='teaching epoch')
-flags.DEFINE_integer('teach_runs', default=5, help='teaching epoch')
 
 
 def unwrap(var):
@@ -157,45 +155,37 @@ def train(dataset, model, tb_writer):
 def run(training_folder):
     logs = []
     dataset = Dataset()
-    for i in range(FLAGS.runs):
-        writer = SummaryWriter(os.path.join(training_folder, 'train/run{}'.format(i)))
-        model = Model()
-        if FLAGS.cuda:
-            model = model.cuda()
-        train(dataset, model, writer)
-        writer.close()
-        stats = parse_tb_event_files(os.path.join(training_folder, 'train/run{}'.format(i)))
-        stats = {k: v.to_dict() for k, v in stats.items()}
-        logs.append(stats)
+    writer = SummaryWriter(os.path.join(training_folder, 'logs'))
+    model = Model()
+    if FLAGS.cuda:
+        model = model.cuda()
+    train(dataset, model, writer)
+    writer.close()
 
-    # Save run data
-    with open(os.path.join(training_folder, 'stats.pkl'), 'wb') as f:
-        pickle.dump(logs, f)
+    ## Create
+    #sns.set(font_scale=1.5)
+    #sns.set_style("ticks", {'font.family': 'serif'})
+    #plt.tight_layout()
 
-    # Create
-    sns.set(font_scale=1.5)
-    sns.set_style("ticks", {'font.family': 'serif'})
-    plt.tight_layout()
-
-    new_logs = [[(epoch, info_x, tre, val_acc, lb, val_loss, tre_no_mean)
-                 for epoch, info_x, tre, val_acc, lb, val_loss, tre_no_mean in zip(log[LB]['steps'], log[INFO_TX]['values'],
-                                                                                   log[HOM]['values'], log[VAL_ACC]['values'],
-                                                                                   log[LB]['values'],
-                                                                                   log[VAL_LOSS]['values'],
-                                                                                   log[HOM_WO_MEAN]['values'])]
-                 for log in logs]
-    log = sum(new_logs, [])
-    data = DataFrame(np.asarray(log), columns=['epoch', 'MI', 'TRE', 'val_acc',
-                                               'LB', 'val_loss', 'TRE_no_mean'])
-    tobeplot = data.columns[1:]
-    for x_id in range(len(tobeplot)):
-        for y_id in range(x_id + 1, len(tobeplot)):
-            names = [tobeplot[x_id], tobeplot[y_id]]
-            names = sorted(names)
-            x_name, y_name = names
-            sns.lmplot(x=x_name, y=y_name, data=data)
-            logging.info("pearson coeffcient {} {}: {}".format(
-                x_name, y_name,
-                scipy.stats.pearsonr(data[x_name], data[y_name])))
-            plt.savefig(os.path.join(training_folder, '{}_{}.pdf'.format(x_name, y_name)),
-                        format='pdf')
+    #new_logs = [[(epoch, info_x, tre, val_acc, lb, val_loss, tre_no_mean)
+    #             for epoch, info_x, tre, val_acc, lb, val_loss, tre_no_mean in zip(log[LB]['steps'], log[INFO_TX]['values'],
+    #                                                                               log[HOM]['values'], log[VAL_ACC]['values'],
+    #                                                                               log[LB]['values'],
+    #                                                                               log[VAL_LOSS]['values'],
+    #                                                                               log[HOM_WO_MEAN]['values'])]
+    #             for log in logs]
+    #log = sum(new_logs, [])
+    #data = DataFrame(np.asarray(log), columns=['epoch', 'MI', 'TRE', 'val_acc',
+    #                                           'LB', 'val_loss', 'TRE_no_mean'])
+    #tobeplot = data.columns[1:]
+    #for x_id in range(len(tobeplot)):
+    #    for y_id in range(x_id + 1, len(tobeplot)):
+    #        names = [tobeplot[x_id], tobeplot[y_id]]
+    #        names = sorted(names)
+    #        x_name, y_name = names
+    #        sns.lmplot(x=x_name, y=y_name, data=data)
+    #        logging.info("pearson coeffcient {} {}: {}".format(
+    #            x_name, y_name,
+    #            scipy.stats.pearsonr(data[x_name], data[y_name])))
+    #        plt.savefig(os.path.join(training_folder, '{}_{}.pdf'.format(x_name, y_name)),
+    #                    format='pdf')
