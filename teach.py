@@ -24,9 +24,9 @@ def get_lr(optimizer):
         return param_group["lr"]
 
 
-def get_learnability(dataset, teacher):
+def get_learnability(dataset, teacher, zero_mean=True):
     teacher.eval()
-    mean_repr = get_mean_repr(dataset, teacher)
+    mean_repr = get_mean_repr(dataset, teacher) if zero_mean else None
     best_lb = -10
     student = Model()
     if FLAGS.cuda:
@@ -66,14 +66,16 @@ def get_mean_repr(dataset, teacher):
     return mean_repr
 
 
-def train_loop(dataset, teacher, student, opt, mean_repr):
+def train_loop(dataset, teacher, student, opt, mean_repr=None):
     trn_lb = 0
     count = 0
 
     for _ in range(FLAGS.batchs_per_epoch):
         batch = dataset.get_train_batch(FLAGS.batch_size)
         with torch.no_grad():
-            teacher_repr = teacher.get_repr(batch) - mean_repr
+            teacher_repr = teacher.get_repr(batch)
+            if mean_repr is not None:
+                teacher_repr = teacher_repr - mean_repr
         student_repr = student.get_repr(batch)
         sims = get_sim(teacher_repr, student_repr)
         opt.zero_grad()
@@ -89,13 +91,15 @@ def train_loop(dataset, teacher, student, opt, mean_repr):
     return trn_lb
 
 
-def val_loop(dataset, teacher, student, mean_repr):
+def val_loop(dataset, teacher, student, mean_repr=None):
     val_lb = 0
     count = 0
     with torch.no_grad():
         batch = dataset.get_val_batch()
         with torch.no_grad():
-            teacher_repr = teacher.get_repr(batch) - mean_repr
+            teacher_repr = teacher.get_repr(batch)
+            if mean_repr is not None:
+                teacher_repr = teacher_repr - mean_repr
         student_repr = student.get_repr(batch)
         sims = get_sim(teacher_repr, student_repr)
         val_lb += sims.sum().item()

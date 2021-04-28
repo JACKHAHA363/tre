@@ -51,9 +51,10 @@ CVAL_ACC = 'cval_acc'
 INFO_TX = 'MI'
 ISOM = 'isom'
 HOM = 'hom'
-HOM_WO_MEAN = 'hom_wo_mean'
+HOM_ZERO_MEAN = 'hom_zm'
 CHOM = 'c_hom'
-LB = 'learnability'
+LB_ZERO_MEAN = 'lb_zm'
+LB = "lb"
 
 
 def validate(dataset, model):
@@ -61,8 +62,8 @@ def validate(dataset, model):
     metrics = {}
 
     # Learnability
-    lb = teach.get_learnability(dataset, teacher=model)
-    metrics[LB] = lb
+    metrics[LB_ZERO_MEAN] = teach.get_learnability(dataset, teacher=model, zero_mean=True)
+    metrics[LB] = teach.get_learnability(dataset, teacher=model, zero_mean=False)
 
     val_batch = dataset.get_val_batch()
     val_loss, val_acc, _, val_reps = model(val_batch)
@@ -94,7 +95,7 @@ def validate(dataset, model):
         exprs=prim_batch.lf + val_batch.lf, quiet=True,
         subtract_mean=True,
     )
-    metrics[HOM_WO_MEAN] = np.mean(comp)
+    metrics[HOM_ZERO_MEAN] = np.mean(comp)
 
     info_tx = info(unwrap(val_reps))
     metrics[INFO_TX] = info_tx
