@@ -151,6 +151,8 @@ def train(dataset, model, tb_writer):
             tb_writer.add_scalar('{}'.format(key), val, epoch)
         logging.info(' '.join(logging_str))
 
+        tb_writer.flush()
+
 
 def run(training_folder):
     logs = []
